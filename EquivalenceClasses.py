@@ -90,7 +90,6 @@ def build_equiv_class_from_prior(cap_size, arank):
                 # print('Row to Append', new_row)
                 # print('PrevM', prev_M)
                 M = np.vstack([prev_M, new_row])
-                case = get_affine_case(M)
                 # print('NewM', M)
                 # for failed_case in failed_cases:
                 #     if collections.Counter(failed_case) == collections.Counter(case):
@@ -104,8 +103,9 @@ def build_equiv_class_from_prior(cap_size, arank):
                     continue
                 failed = False
                 dupe = False
+                case = get_affine_case(M)
                 for verified_case in verified_cases:
-                    if collections.Counter(verified_case) == collections.Counter(case):
+                    if affine_cases_equal(case, verified_case):
                         dupe = True
                         break
                 if dupe:
@@ -124,11 +124,19 @@ def build_equiv_class_from_prior(cap_size, arank):
     return to_return
 
 
+# Returns the affine case of a given matrix
 def get_affine_case(M):
-    sums = []
-    for row in M:
-        sums.append(np.sum(row))
-    return sums
+    # for row in M:
+    #     row_sums.append(np.sum(row))
+    row_sums = np.sum(M, axis=1)
+    col_sums = np.sum(M, axis=0)
+    return row_sums, col_sums
+
+
+# Checks to see if two affine cases are equal
+def affine_cases_equal(case1, case2):
+    return collections.Counter(case1[0]) == collections.Counter(case2[0]) and collections.Counter(
+        case1[1]) == collections.Counter(case2[1])
 
 
 def verify_matrix(M):
@@ -233,5 +241,5 @@ def print_all_cap_stats():
 
 # calculate_equiv_classes(100, 14)
 # calculate_equiv_classes(1000)
-# calculate_equiv_classes(26, 12)
-#print_all_cap_stats()
+#calculate_equiv_classes(100, 13)
+print_all_cap_stats()
