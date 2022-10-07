@@ -2,8 +2,9 @@ import collections
 import os.path
 import random
 from itertools import combinations
-
+from multiprocessing import Pool
 import numpy as np
+import time
 
 
 def data_exists(cap_size, arank):
@@ -15,7 +16,9 @@ def load_data(cap_size, arank):
 
 
 def save_data(cap_size, arank):
-    if data_exists(cap_size, arank):
+    print('Working on', cap_size, arank)
+    # Data already exists or this is a max cap
+    if data_exists(cap_size, arank) or data_exists(cap_size, arank + 1):
         return
     data = get_equiv_classes(cap_size, arank)
     if data is None:
@@ -67,71 +70,178 @@ def get_equiv_classes(cap_size, arank):
 
 
 def build_equiv_class_from_prior(cap_size, arank):
-    to_return = []
-    verified_cases = []
+    # Save both the row/col sums and the more complicated verified cases
+    # row_col_sums_verified_cases = []
+    # row_span_verified_cases = []
     # failed_cases = []
     # Build off of prior equiv classes
-    for prev_M in get_equiv_classes(cap_size - 1, arank):
-        # The length of affine combinations
-        for aff_combo_len in range(5, arank + 1):
-            # Skip even-length affine combinations
-            if aff_combo_len % 2 == 0:
-                continue
-            failed = True
 
-            # All the ways that an affine combination can be placed into the matrix
-            combs = list(combinations(np.arange(arank), aff_combo_len))
-            random.shuffle(combs)
-            for comb in combs:
-                arr = np.zeros(arank)
-                for i in comb:
-                    arr[i] = 1
-                new_row = np.array(arr)
-                # print('Row to Append', new_row)
-                # print('PrevM', prev_M)
-                M = np.vstack([prev_M, new_row])
-                case = get_affine_case(M)
-                # print('NewM', M)
-                # for failed_case in failed_cases:
-                #     if collections.Counter(failed_case) == collections.Counter(case):
-                #         # Although this case does fail, we do not want to add it to the list once again,
-                #         # so set failed to false, avoid excess memory usage.
-                #         # failed = False
-                #         break
-                # Check for duplicates before verifying
-                # This is to avoid revalidating the same case multiple times
-                if not verify_matrix(M):
-                    continue
-                failed = False
-                dupe = False
-                for verified_case in verified_cases:
-                    if collections.Counter(verified_case) == collections.Counter(case):
-                        dupe = True
-                        break
-                if dupe:
-                    # print('Duplicate')
+    prev_classes = get_equiv_classes(cap_size - 1, arank)
+
+    start = time.time()
+
+    with Pool() as p:
+        prev_classes_and_equiv = np.array(p.map(find_equiv_matrices, prev_classes))
+
+    matrices_to_process = []
+    cases = []
+    for c in prev_classes_and_equiv:
+        for matrix in c:
+            dupe = False
+            case = get_row_col_sums(matrix)
+            for added_case in cases:
+                if row_col_sums_equal(case, added_case):
+                    dupe = True
                     break
-                verified_cases.append(case)
-                to_return.append(M)
-                break
+            if not dupe:
+                matrices_to_process.append(matrix)
+                cases.append(case)
 
-            if failed:
-                # failed_cases.append(case)
-                # todo can we break here? no further can be fit if this can't be fit, right?
-                break
+    # for matrix in prev_classes:
+    #     matrices_to_process.append(matrix)
+    #     for equiv_matrix in find_equiv_matrices(matrix):
+    #         matrices_to_process.append(equiv_matrix)
+
+    end = time.time()
+    init_queue_time = end - start
+
+    arank_arr = [arank] * len(matrices_to_process)
+    to_process = zip(matrices_to_process, arank_arr)
+
+    start = time.time()
+    with Pool() as p:
+        results = p.starmap(build_matrix, to_process)
+    to_return = list(filter(lambda item: item is not None, results))
     if len(to_return) == 0:
         return None
+
+    end = time.time()
+    process_time = end - start
+    print('init_time=', init_queue_time, 'process_time=', process_time, 'n=', len(matrices_to_process))
+    return to_return
+    #
+    # for prev_M in get_equiv_classes(cap_size - 1, arank):
+
+
+def build_matrix(prev_M, arank):
+    # arank = len(prev_M[0])
+    # The length of affine combinations
+    for aff_combo_len in range(5, arank + 1):
+        # Skip even-length affine combinations
+        if aff_combo_len % 2 == 0:
+            continue
+
+        # All the ways that an affine combination can be placed into the matrix
+        combs = list(combinations(np.arange(arank), aff_combo_len))
+        random.shuffle(combs)
+        for comb in combs:
+            arr = np.zeros(arank)
+            for i in comb:
+                arr[i] = 1
+            new_row = np.array(arr)
+            M = np.vstack([prev_M, new_row])
+            if verify_matrix(M):
+                return M
+
+
+def find_equiv_matrices(M):
+    """
+    Finds equivalent representation matrices by doing a change of basis.
+    Ignores strongly equivalent cases, or in other words, the cases that have the same row and column sums).
+    :param M: The representation matrix
+    :return: An array of matrices cases, including the original
+    """
+    to_return = [M]
+    strong_equiv_cases = [get_row_col_sums(M)]
+
+    rows = len(M)
+    arank = len(M[0])
+    # For each point not in the basis
+    for row in range(0, rows):
+        # The basis point to switch
+        for to_switch in range(0, arank):
+            B = change_basis(M, row, to_switch)
+            if not verify_matrix(B):
+                continue
+            case = get_row_col_sums(B)
+            dupe = False
+            for strong_equiv_case in strong_equiv_cases:
+                if row_col_sums_equal(case, strong_equiv_case):
+                    dupe = True
+                    break
+            if dupe:
+                continue
+            to_return.append(B)
+            strong_equiv_cases.append(case)
     return to_return
 
 
-def get_affine_case(M):
-    sums = []
-    for row in M:
-        sums.append(np.sum(row))
-    return sums
+def change_basis(M, row, to_switch):
+    """
+    Performs a basis change on a representation matrix
+    :param A: The representation matrix
+    :param row: The row (representing a non-basis point) to operate on
+    :param to_switch: The basis point to switch
+    :return: A new representation matrix that went through a basis change
+    """
+    to_add = np.array(M[row])
+    to_add[to_switch] = 0
+    to_return = []
+    for i in range(0, len(M)):
+        if i == row or M[i][to_switch] == 0:
+            to_return.append(M[i])
+            continue
+        to_return.append(np.mod(np.add(M[i], to_add), 2))
+    return to_return
+
+
+# Checks to see if row/col sums are equal first
+def get_row_col_sums(M):
+    row_sums = np.sum(M, axis=1)
+    col_sums = np.sum(M, axis=0)
+    return row_sums, col_sums
+
+
+# Checks to see if two affine cases are equal
+def row_col_sums_equal(case1, case2):
+    return collections.Counter(case1[0]) == collections.Counter(case2[0]) and collections.Counter(
+        case1[1]) == collections.Counter(case2[1])
+
+
+def get_row_span(M):
+    rows = len(M)
+    arank = len(M[0])
+    # We don't need to include the zero vector as that is trivial
+    span = []
+    for k in range(1, rows + 1):  # Choose from 1 to rows (inclusive)
+        k_combs = combinations(np.arange(rows), k)
+        for row_comb in k_combs:
+            row_sum = np.zeros(arank)
+            for row_index in row_comb:
+                row_sum += M[row_index]
+            row_sum %= 2
+            span.append(row_sum)
+    return span
+
+
+# Here we aren't actually seeing if the spans are equal.
+def row_spans_equiv(span1, span2):
+    span_1_sums = get_span_sums(span1)
+    span_2_sums = get_span_sums(span2)
+    return collections.Counter(span_1_sums) == collections.Counter(span_2_sums)
+
+
+def get_span_sums(span):
+    to_return = []
+    for v in span:
+        to_return.append(np.sum(v))
+    return to_return
 
 
 def verify_matrix(M):
+    for row_sum in get_row_col_sums(M)[0]:
+        if row_sum % 2 == 0:
+            return False
     row_amt = len(M)
     # Get all possible combinations of two integers between [0,rowAmt)
     # np.arange(row_amt) == [0, ..., row_amt -1]
@@ -185,15 +295,20 @@ def calculate_equiv_classes(cap_size_bound, arank_bound=None):
     if arank_bound is None:
         arank_bound = cap_size_bound + 1
     for C in range(5, cap_size_bound):
+        # tasks = []
         for R in range(curr_min_arank, C + 1):
             if R >= arank_bound:
                 break
+            # tasks.append((C, R))
             # R = min(R, 11)
             # classes = get_equiv_classes(C, R)
             # if classes is not None:
             # equiv_classes[C, R] = classes
-            print('Working on', C, R)
             save_data(C, R)
+        # save_data(C, R)
+        # print(tasks)
+        # with Pool() as p:
+        #     p.starmap(save_data, tasks)
         curr_min_arank = get_min_arank(C)
         # Progress Updates
         # cap_rank_stats = []
@@ -227,11 +342,72 @@ def print_cap_num_classes(cap_size):
 
 
 def print_all_cap_stats():
-    for cap_size in range(5, 42):
+    for cap_size in range(5, 60):
         print_cap_num_classes(cap_size)
 
 
 # calculate_equiv_classes(100, 14)
 # calculate_equiv_classes(1000)
-# calculate_equiv_classes(26, 12)
-#print_all_cap_stats()
+# print_all_cap_stats()
+
+
+# This works, as it should
+# M = [[1, 1, 1, 1, 1, 1, 1, 0, 0],
+#      [0, 0, 1, 1, 1, 1, 1, 1, 1],
+#      [1, 0, 1, 1, 0, 0, 0, 1, 1]]
+# B = [[1, 1, 1, 1, 1, 1, 1, 0, 0],
+#      [1, 1, 1, 0, 0, 0, 0, 1, 1],
+#      [0, 1, 1, 0, 1, 1, 1, 1, 1]]
+# span = (get_row_span(M))
+# span_2 = get_row_span(B)
+# print(span)
+# print(row_spans_equiv(span, span_2))
+
+def build_cap(M):
+    r = len(M)
+    k = r + len(M[0])  # r + k-r = k
+    cap = [0]
+    # Init the basis
+    for i in range(1, k - r):
+        cap.append(pow(2, i - 1))
+    for row in M:
+        pt = 0
+        for i in range(0, len(row)):
+            if row[i] == 1:
+                pt ^= int(pow(2, i - 1))
+        cap.append(pt)
+    return cap
+
+
+# print_all_cap_stats()
+
+# # Change of basis test
+# M = [np.array([1, 1, 1, 1, 1, 1, 1, 0, 0]),
+#      np.array([0, 0, 1, 1, 1, 1, 1, 1, 1]),
+#      np.array([1, 0, 1, 1, 0, 0, 0, 1, 1])]
+# # print(change_basis(M, 0, 2))
+# # print(M)
+# equiv_matrices = find_equiv_matrices(M)
+# print('change of basis:', equiv_matrices)
+# print(len(equiv_matrices))
+# for equiv_matrix in equiv_matrices:
+#     print(get_row_col_sums(equiv_matrix))
+# print(find_equiv_matrices(M))
+
+
+if __name__ == '__main__':
+    # I saw a 52 in dim 12, could not find 53
+    # saw 68 in dim 13
+    # saw 88 in dim 14, found an 89
+    # print(len(get_equiv_classes(32, 12)))
+    # rows = 5
+    # for row_sample_size in range(rows, 0, -1):
+    #     for comb in combinations(range(rows), row_sample_size):
+    #         print(comb)
+    #
+    # for M in get_equiv_classes(14, 9):
+    #     print(M)
+    #     print(build_cap(M))
+
+    calculate_equiv_classes(26, 14)  # recommended test
+
