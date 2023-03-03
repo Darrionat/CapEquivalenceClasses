@@ -84,3 +84,24 @@ def change_basis(M, row, to_switch):
             continue
         to_return.append(np.mod(np.add(M[i], to_add), 2))
     return to_return
+
+
+def build_cap(M):
+    """
+    Returns a list containing cap points that can be added to the cap finder
+    :param M: The cap matrix
+    :return:  A cap with the given cap matrix
+    """
+    r = len(M)
+    k = r + len(M[0])  # r + k-r = k
+    cap = [0]
+    # Init the basis
+    for i in range(1, k - r):
+        cap.append(pow(2, i - 1))
+    for row in M:
+        pt = 0
+        for i in range(0, len(row)):
+            if row[i] == 1:
+                pt ^= int(pow(2, i - 1))
+        cap.append(pt)
+    return cap

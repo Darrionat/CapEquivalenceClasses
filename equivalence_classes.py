@@ -219,21 +219,5 @@ def print_all_cap_stats():
         data_handler.print_cap_num_classes(cap_size)
 
 
-def build_cap(M):
-    r = len(M)
-    k = r + len(M[0])  # r + k-r = k
-    cap = [0]
-    # Init the basis
-    for i in range(1, k - r):
-        cap.append(pow(2, i - 1))
-    for row in M:
-        pt = 0
-        for i in range(0, len(row)):
-            if row[i] == 1:
-                pt ^= int(pow(2, i - 1))
-        cap.append(pt)
-    return cap
-
-
 if __name__ == '__main__':
     run_sim(25, 15)
