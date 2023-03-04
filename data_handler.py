@@ -56,7 +56,7 @@ def get_equiv_class_count(cap_size, arank):
     return len(data) if cap_size != arank else 1
 
 
-def get_cap_num_classes(cap_size):
+def print_cap_stats(cap_size):
     arr = []
     minrank = get_min_arank(cap_size)
     if minrank is None:
@@ -65,4 +65,11 @@ def get_cap_num_classes(cap_size):
         count = get_equiv_class_count(cap_size, arank)
         if count != -1:
             arr.append(count)
-    print(str(cap_size) + '-Cap Equiv Class Count', arr)
+    if len(arr) == 0:
+        return
+    print(str(cap_size) + '-Cap Equiv Class Count')
+    i = 0
+    for x in arr:
+        arank = str(minrank + i)
+        print(f'\tarank=' + arank, '\t#classes=', x)
+        i += 1

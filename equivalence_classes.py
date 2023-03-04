@@ -56,6 +56,7 @@ def build_equiv_class_from_prior(cap_size, arank):
 
     prev_classes_and_equals = gen_equal_classes(prev_classes)
 
+    # Matrices that do not have the same row/column sums but potentially are equivalent by change of basis
     matrices_to_process = []
     cases = []
     for matrix in prev_classes_and_equals:
@@ -69,11 +70,6 @@ def build_equiv_class_from_prior(cap_size, arank):
             matrices_to_process.append(matrix)
             cases.append(case)
 
-    # for matrix in prev_classes:
-    #     matrices_to_process.append(matrix)
-    #     for equiv_matrix in find_equiv_matrices(matrix):
-    #         matrices_to_process.append(equiv_matrix)
-
     arank_arr = [arank] * len(matrices_to_process)
     to_process = zip(matrices_to_process, arank_arr)
 
@@ -82,7 +78,9 @@ def build_equiv_class_from_prior(cap_size, arank):
     to_return = list(filter(lambda item: item is not None, results))
     if len(to_return) == 0:
         return None
-
+    purge_strong_duplicate_cases(to_return)
+    # todo implement this
+    # purge_basis_duplicate_cases(to_return)
     return to_return
 
 
@@ -118,7 +116,8 @@ def gen_equal_classes(equivalence_classes):
         to_return.append(equiv_class)
         # Adds multiple equivalence classes to the list
         to_return.extend(find_equiv_matrices(equiv_class))
-    # Remove all strongly equivalent cases
+    # Remove all strongly equivalent cases.
+    # We actually don't want to remove the basis equiv ones because there's potential for a different cap to be made
     purge_strong_duplicate_cases(to_return)
     return to_return
 
@@ -144,6 +143,7 @@ def find_equiv_matrices(M):
                 continue
             case = cmat.get_row_col_sums(B)
             dupe = False
+
             for strong_equiv_case in strong_equiv_cases:
                 if row_col_sums_equal(case, strong_equiv_case):
                     dupe = True
@@ -171,6 +171,44 @@ def purge_strong_duplicate_cases(equiv_classes):
         if dupe:
             continue
         cases.append(case)
+
+
+def purge_basis_duplicate_cases(equiv_classes):
+    """
+    Purges any sort of equivalence by change of basis.
+    This assumes that the original list does not contain any that have the same strong case
+    :param equiv_classes: The equivalence classes
+    """
+
+    all_cases = []
+    for M in equiv_classes:
+        all_cases.append(cmat.get_row_col_sums(M))
+    i = 0
+    while i < len(equiv_classes):
+        M = equiv_classes[i]
+        dupe_indicies = []
+        m_case = cmat.get_row_col_sums(M)
+        # We know that the case of M and its equivalent matrices are different
+        # since find_equiv_matrices doesn't allow any to have the same strong case
+        for equiv_M in find_equiv_matrices(M):
+            case = cmat.get_row_col_sums(equiv_M)
+            dupe = False
+            for j in range(0, len(all_cases)):
+                if i == j:
+                    continue
+                if j in dupe_indicies:
+                    continue
+                c = all_cases[j]
+                if row_col_sums_equal(case, c):
+                    dupe = True
+                    dupe_indicies.append(j)
+                    break
+            if dupe:
+                continue
+
+        i += 1
+    # Return classes with duplicate indicies removed
+    equiv_classes = [ele for idx, ele in enumerate(equiv_classes) if idx not in dupe_indicies]
 
 
 # Checks to see if two affine cases are equal
@@ -216,8 +254,22 @@ def run_sim(cap_size_bound, arank_bound=None):
 
 def print_all_cap_stats():
     for cap_size in range(5, 60):
-        data_handler.print_cap_num_classes(cap_size)
+        data_handler.print_cap_stats(cap_size)
+
+
+def print_all_caps(cap_size, arank):
+    """
+    Gets the equivalence classes and also builds the caps
+    :param cap_size:
+    :param arank:
+    :return:
+    """
+    equiv_classes = data_handler.load_data(cap_size, arank)
+    for M in equiv_classes:
+        print(cmat.build_cap(M))
 
 
 if __name__ == '__main__':
-    run_sim(25, 15)
+    run_sim(26, 15)
+    # print_all_cap_stats()
+    # print(data_handler.load_data(12, 9))
