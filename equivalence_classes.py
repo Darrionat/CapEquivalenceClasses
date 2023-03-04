@@ -63,7 +63,7 @@ def build_equiv_class_from_prior(cap_size, arank):
         dupe = False
         case = cmat.get_row_col_sums(matrix)
         for added_case in cases:
-            if row_col_sums_equal(case, added_case):
+            if cmat.row_col_sums_equal(case, added_case):
                 dupe = True
                 break
         if not dupe:
@@ -78,9 +78,8 @@ def build_equiv_class_from_prior(cap_size, arank):
     to_return = list(filter(lambda item: item is not None, results))
     if len(to_return) == 0:
         return None
-    purge_strong_duplicate_cases(to_return)
-    # todo implement this
-    # purge_basis_duplicate_cases(to_return)
+    # purge_strong_duplicate_cases(to_return)
+    purge_basis_duplicate_cases(to_return)
     return to_return
 
 
@@ -112,13 +111,23 @@ def gen_equal_classes(equivalence_classes):
     :return: All equivalence classes in the original list and those that are equivalent to any that are given.
     """
     to_return = []
-    for equiv_class in equivalence_classes:
-        to_return.append(equiv_class)
-        # Adds multiple equivalence classes to the list
-        to_return.extend(find_equiv_matrices(equiv_class))
+
+    with Pool() as p:
+        results = p.map(find_equiv_matrices, equivalence_classes)
+    to_return.extend(equivalence_classes)
+    for equiv_matrices in results:
+        for matrix in equiv_matrices:
+            if matrix != [[]]:
+                to_return.append(matrix)
+    # for equiv_class in equivalence_classes:
+    #     to_return.append(equiv_class)
+    #     # Adds multiple equivalence classes to the list
+    #     to_return.extend(find_equiv_matrices(equiv_class))
+
     # Remove all strongly equivalent cases.
     # We actually don't want to remove the basis equiv ones because there's potential for a different cap to be made
-    purge_strong_duplicate_cases(to_return)
+    # purge_strong_duplicate_cases(to_return)
+    purge_basis_duplicate_cases(to_return)
     return to_return
 
 
@@ -145,13 +154,15 @@ def find_equiv_matrices(M):
             dupe = False
 
             for strong_equiv_case in strong_equiv_cases:
-                if row_col_sums_equal(case, strong_equiv_case):
+                if cmat.row_col_sums_equal(case, strong_equiv_case):
                     dupe = True
                     break
             if dupe:
                 continue
             to_return.append(B)
             strong_equiv_cases.append(case)
+    if len(to_return) == 0:
+        return [[[]]]
     return to_return
 
 
@@ -165,7 +176,7 @@ def purge_strong_duplicate_cases(equiv_classes):
         case = cmat.get_row_col_sums(M)
         dupe = False
         for c in cases:
-            if row_col_sums_equal(case, c):
+            if cmat.row_col_sums_equal(case, c):
                 dupe = True
                 break
         if dupe:
@@ -179,7 +190,13 @@ def purge_basis_duplicate_cases(equiv_classes):
     This assumes that the original list does not contain any that have the same strong case
     :param equiv_classes: The equivalence classes
     """
+    for comb in combinations(equiv_classes, 2):
+        A = comb[0]
+        B = comb[1]
+        if cmat.equiv_cap_matrices(A, B):
+            equiv_classes = np.delete(equiv_classes, B)
 
+    '''
     all_cases = []
     for M in equiv_classes:
         all_cases.append(cmat.get_row_col_sums(M))
@@ -199,7 +216,7 @@ def purge_basis_duplicate_cases(equiv_classes):
                 if j in dupe_indicies:
                     continue
                 c = all_cases[j]
-                if row_col_sums_equal(case, c):
+                if cmat.row_col_sums_equal(case, c):
                     dupe = True
                     dupe_indicies.append(j)
                     break
@@ -209,19 +226,7 @@ def purge_basis_duplicate_cases(equiv_classes):
         i += 1
     # Return classes with duplicate indicies removed
     equiv_classes = [ele for idx, ele in enumerate(equiv_classes) if idx not in dupe_indicies]
-
-
-# Checks to see if two affine cases are equal
-def row_col_sums_equal(case1, case2):
-    return collections.Counter(case1[0]) == collections.Counter(case2[0]) and collections.Counter(
-        case1[1]) == collections.Counter(case2[1])
-
-
-# Here we aren't actually seeing if the spans are equal.
-def row_spans_equiv(span1, span2):
-    span_1_sums = get_span_sums(span1)
-    span_2_sums = get_span_sums(span2)
-    return collections.Counter(span_1_sums) == collections.Counter(span_2_sums)
+    '''
 
 
 def get_span_sums(span):

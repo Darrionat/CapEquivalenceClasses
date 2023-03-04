@@ -1,7 +1,9 @@
 from itertools import combinations
 import numpy as np
+import collections
 
 
+# Todo: Row span could be a way of determining equivalence
 def get_row_span(M):
     rows = len(M)
     arank = len(M[0])
@@ -16,6 +18,20 @@ def get_row_span(M):
             row_sum %= 2
             span.append(row_sum)
     return span
+
+
+# Checks to see if two affine cases are equal
+def row_col_sums_equal(case1, case2):
+    return collections.Counter(case1[0]) == collections.Counter(case2[0]) and collections.Counter(
+        case1[1]) == collections.Counter(case2[1])
+
+
+def equiv_cap_matrices(A, B):
+    span1 = get_row_span(A)
+    span2 = get_row_span(B)
+    case1 = get_row_col_sums(span1)
+    case2 = get_row_col_sums(span2)
+    return row_col_sums_equal(case1, case2)
 
 
 def get_row_col_sums(M):
@@ -40,12 +56,11 @@ def is_cap_matrix(M):
     for comb in two_combs:
         # The two rows to compare
         r1, r2 = M[comb[0]], M[comb[1]]
-        if np.array_equal(r1, r2):
-            return False
-        # Sum the two arrays over Z_2
+        sum = np.sum((r1 + r2) % 2)
+        # If sum == 0, then rows are equal
         # If the sum of the elements in the array sum to 2,
         # then these two points sum to another two points, forming a quad
-        if np.sum((r1 + r2) % 2) == 2:
+        if sum == 0 or sum == 2:
             return False
 
     three_combs = combinations(np.arange(row_amt), 3)
@@ -105,3 +120,28 @@ def build_cap(M):
                 pt ^= int(pow(2, i - 1))
         cap.append(pt)
     return cap
+
+
+if __name__ == '__main__':
+    cover_32_5 = build_cap([[0, 0, 1, 1, 1, 1, 0, 0, 1, 1, 1],
+                            [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+                            [1, 1, 1, 0, 1, 1, 1, 1, 0, 0, 0],
+                            [1, 1, 1, 0, 0, 1, 0, 0, 1, 0, 0],
+                            [0, 1, 0, 1, 1, 0, 1, 0, 1, 0, 0],
+                            [0, 0, 1, 0, 0, 0, 1, 1, 0, 1, 1],
+                            [0, 1, 0, 0, 1, 1, 1, 0, 1, 1, 1],
+                            [0, 1, 0, 0, 1, 0, 0, 1, 1, 0, 1],
+                            [1, 0, 1, 0, 1, 1, 0, 0, 0, 1, 0],
+                            [1, 1, 0, 0, 1, 0, 1, 1, 1, 1, 0],
+                            [1, 1, 0, 1, 0, 0, 1, 0, 0, 0, 1],
+                            [0, 1, 1, 0, 1, 0, 0, 1, 0, 1, 0],
+                            [0, 1, 0, 1, 0, 1, 1, 1, 1, 1, 0],
+                            [1, 1, 1, 1, 1, 0, 1, 0, 0, 1, 0],
+                            [1, 1, 0, 1, 0, 0, 0, 0, 1, 1, 0],
+                            [1, 0, 1, 0, 1, 0, 1, 1, 1, 0, 1],
+                            [1, 1, 0, 1, 1, 1, 0, 1, 0, 1, 0],
+                            [0, 1, 1, 0, 0, 1, 0, 1, 0, 0, 1],
+                            [0, 0, 1, 1, 1, 0, 1, 0, 0, 0, 1],
+                            [1, 0, 0, 1, 1, 1, 0, 1, 1, 0, 1],
+                            [0, 1, 0, 1, 1, 1, 0, 0, 0, 0, 1]])
+    print(cover_32_5)

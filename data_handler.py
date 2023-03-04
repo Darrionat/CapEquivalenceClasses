@@ -29,7 +29,8 @@ def save_data(cap_size, arank, data):
         raise ValueError('No data provided to save')
     # Data already exists or this is a max cap
     if data_exists(cap_size, arank) or data_exists(cap_size, arank + 1):
-        raise ValueError('Data already exists')
+        print('Data already exists')
+        return
     folder = get_folder_path(cap_size)
     try:
         os.mkdir(folder)
