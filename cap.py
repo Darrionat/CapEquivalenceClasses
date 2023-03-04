@@ -34,6 +34,12 @@ def is_cap(points):
     return True
 
 
+"""
+Cache the binary string arrow 
+"""
+binStringCache = {}
+
+
 def calc_arank(points):
     """
     Computes the affine rank of the given points.
@@ -51,12 +57,16 @@ def calc_arank(points):
             continue
         translate = p ^ fixed_pt
         # todo there could be cacheing for this
-        # Convert to binary
-        binary = "{0:b}".format(translate)
-        # Add proper padding
-        paddedBin = binary.rjust(dim, '0')
+        if translate in binStringCache:
+            arr = binStringCache[translate]
+        else:
+            # Convert to binary
+            binary = "{0:b}".format(translate)
+            # Add proper padding
+            paddedBin = binary.rjust(dim, '0')
+            arr = [int(d) for d in str(paddedBin)]
+            binStringCache[translate] = arr
         # Converts into an array of char
-        arr = [int(d) for d in str(paddedBin)]
         M.append(arr)
     transpose = np.transpose(M)
     return linalg.rankOfMatrix(transpose, dim, len(M)) + 1
@@ -157,11 +167,3 @@ def normalize_cap(cap):
     """
     M = find_cap_matrix(cap)
     return cmat.build_cap(M)
-
-
-if __name__ == '__main__':
-    dim10_5cover = [0, 33, 258, 483, 324, 997, 742, 135, 840, 809, 106, 203, 300, 973, 174, 655, 464, 593, 722, 403,
-                    788, 533, 694,
-                    887, 88, 921, 378, 635, 444, 253, 574, 959]
-    # basis = find_ind_subset_with_arank(dim12_56cap, 13)
-    print(normalize_cap(dim10_5cover))
