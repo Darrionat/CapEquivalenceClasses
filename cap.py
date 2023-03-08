@@ -3,6 +3,7 @@ import cap_matrix as cmat
 import numpy as np
 import math
 import linalg
+from tait_won_sidon import build_tait_won_sidon
 
 
 def required_dimension(x):
@@ -167,3 +168,60 @@ def normalize_cap(cap):
     """
     M = find_cap_matrix(cap)
     return cmat.build_cap(M)
+
+
+def excludes_count(cap):
+    excludes = {}
+    for comb in combinations(cap, 3):
+        sum = 0
+        for p in comb:
+            sum ^= p
+        if sum not in excludes:
+            excludes[sum] = 1
+        else:
+            excludes[sum] += 1
+    return excludes
+
+
+def exclude_dist(cap):
+    counts = excludes_count(cap)
+    dist = {}
+    for key in counts:
+        v = counts[key]
+        if v not in dist:
+            dist[v] = 1
+        else:
+            dist[v] += 1
+    return dist
+
+
+def tait_won_case():
+    for d in range(4,64,2):
+        cap  =build_tait_won_sidon(d)
+        sum = 0
+        for p in cap:
+            sum ^= p
+        print(sum)
+    # dim12_ijcover = [0, 65, 514, 963, 196, 1413, 3782, 2567, 1544, 1161, 3466, 3723, 1100, 973, 974, 1487, 336, 1553,
+    #                  1426, 851, 3732,
+    #                  3285, 1622, 1431, 920, 1561, 3802, 2779, 3804, 3677, 3998, 3743, 2592, 3681, 354, 1187, 3492, 3301,
+    #                  2790, 2599,
+    #                  1640, 233, 1194, 939, 876, 237, 3502, 4015, 3312, 4017, 370, 947, 1140, 565, 1526, 567, 1144, 1529,
+    #                  122, 123, 3708,
+    #                  2813, 1662, 895]
+    #
+    # print(sum)
+    # M = find_cap_matrix(dim12_ijcover)
+    # print(cmat.get_row_col_sums(M))
+    # print(normalize_cap(dim12_ijcover))
+
+
+if __name__ == '__main__':
+    for d in range(4, 64, 2):
+        print('Dimension:', d)
+        cap = build_tait_won_sidon(d)
+        print('Cap:', cap)
+        print('Size:', len(cap))
+        dist = exclude_dist(cap)
+        for k in dist:
+            print('\t' + str(k) + '\t' + str(dist[k]))
