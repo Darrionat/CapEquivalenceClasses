@@ -107,7 +107,7 @@ def gold(p, F, k=1, dim=-1, find_nontrivial_k=False):
             if math.gcd(dim, l) == 1:
                 k = l
                 break
-    print(k)
+    # print(k)
     return field_exp(p, int(2 ** k) + 1, F)
 
 
