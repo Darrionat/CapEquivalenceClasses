@@ -3,6 +3,7 @@ import cap_matrix as cmat
 import numpy as np
 import math
 import linalg
+import random
 from tait_won_sidon import build_tait_won_sidon
 
 
@@ -26,13 +27,20 @@ def is_cap(points):
     :param points: The points to check
     :return: True/false if the points are a cap.
     """
-    for comb in combinations(points, 3):
-        exclude = 0
+    pairs = set()
+    for comb in combinations(points, 2):
+        pair_sum = 0
         for x in comb:
-            exclude ^= x
-        if exclude in points:
+            pair_sum ^= x
+        if pair_sum in pairs:
             return False
+        pairs.add(pair_sum)
     return True
+
+
+def is_k_cover(cap):
+    assert is_cap(cap)
+    return len(exclude_dist(cap)) == 1
 
 
 """
@@ -160,6 +168,29 @@ def find_cap_matrix(cap):
     return M
 
 
+def change_basis(cap):
+    M = find_cap_matrix(cap)
+    arank = calc_arank(cap)
+    subset_rank = -1
+    new_basis = None
+    # Randomly find a basis with the same arank in that dimension
+    while subset_rank != arank:
+        new_basis = random.sample(list(np.arange(2 ** dimension(cap))), arank)
+        subset_rank = calc_arank(new_basis)
+    # Build the new cap based on the old matrix
+    to_return = []
+    to_return.extend(new_basis)
+    for row in M:
+        sum = 0
+        col = 0
+        for b in row:
+            if b == 1:
+                sum ^= new_basis[col]
+            col += 1
+        to_return.append(sum)
+    return to_return
+
+
 def normalize_cap(cap):
     """
     Returns an affinely equivalent cap with the standard basis.
@@ -196,8 +227,8 @@ def exclude_dist(cap):
 
 
 def tait_won_case():
-    for d in range(4,64,2):
-        cap  =build_tait_won_sidon(d)
+    for d in range(4, 64, 2):
+        cap = build_tait_won_sidon(d)
         sum = 0
         for p in cap:
             sum ^= p
@@ -214,6 +245,11 @@ def tait_won_case():
     # M = find_cap_matrix(dim12_ijcover)
     # print(cmat.get_row_col_sums(M))
     # print(normalize_cap(dim12_ijcover))
+
+
+def tait_won_change_basis(dim):
+    cap = build_tait_won_sidon(dim)
+    print(change_basis(cap))
 
 
 if __name__ == '__main__':

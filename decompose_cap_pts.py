@@ -1,47 +1,165 @@
+import cap
 from cap import *
 from pyfinite import ffield
 
-if __name__ == '__main__':
-    taiwon4 = [0, 5, 6, 7]
-    taitwon6 = [0, 9, 26, 35, 44, 53, 62, 23]
-    taitwon8 = [0, 17, 130, 243, 196, 165, 22, 23, 168, 249, 250, 203, 140, 173, 142, 207]
-    cap = taitwon8
-    dim = dimension(cap)
+
+def build_points(dim, f):
+    """
+    Builds a set of points in F_{2^n} with the structure (x, f(x)) with respect to the additive isomorphism between
+    F_{2^n} and F_{2^{n/2}} * F_{2^{n/2}}.
+    :param dim: The dimension.
+    :param fx: A function to apply to each point in F_{2^{n/2}}.
+    :return:
+    """
     assert dim % 2 == 0
+    to_return = []
+    for p in range(int(2 ** (dim / 2))):
+        to_return.append(stitch_pts(p, f(p), dim))
+    return to_return
 
-    if dim == 4:
-        for p in cap:
-            left = p & 0b1100
-            binLeft = "{0:b}".format(left)
-            paddedBin = binLeft.rjust(dim, '0')
-            newNum = paddedBin[0:int(dim / 2)]
 
-            left = int(newNum, 2)
-            right = p & 0b0011
-            print(left, right)
-    if dim == 6:
-        for p in cap:
-            left = p & 0b111000
-            binLeft = "{0:b}".format(left)
-            paddedBin = binLeft.rjust(dim, '0')
-            newNum = paddedBin[0:int(dim / 2)]
+def build_pts_4(dim, f, point_structure):
+    """
+        Builds a set of points in F_{2^n} with the structure (x,y,z,w) with respect to the additive isomorphism between
+        F_{2^n} and F_{2^{n/4}} *  ... * F_{2^{n/4}}.
+        :param dim: The dimension.
+        :param fx: A function to apply to each point in F_{2^{n/4}}.
+        :param point_structure: The way to make the points. Defines the form of (x,y,z,w).
+        :return:
+        """
+    assert dim % 4 == 0
+    half_dim = int(dim / 2)
+    to_return = []
+    for p in range(int(2 ** (dim / 4))):
+        point_tuple = point_structure(p, f)
+        stitch1 = stitch_pts(point_tuple[0], point_tuple[1], half_dim)
+        stitch2 = stitch_pts(point_tuple[2], point_tuple[3], half_dim)
+        to_return.append(stitch_pts(stitch1, stitch2, dim))
+    return to_return
 
-            left = int(newNum, 2)
-            right = p & 0b000111
-            print(left, right)
 
+def stitch_pts(left, right, dim):
+    """
+    Stitches the two binary strings of the given points together.
+    Given two point p1 and p2, we return the point (p1, p2).
+    :param left: p1
+    :param right: p2
+    :param dim: The dimension of the point to return.
+    :return:
+    """
+    assert dim % 2 == 0
+    half_dim = int(dim / 2)
+    # Left
+    bin_left = "{0:b}".format(left)
+    bin_right = "{0:b}".format(right)
+    padded_left = bin_left.rjust(half_dim, '0')
+    padded_right = bin_right.rjust(half_dim, '0')
+    left_bin_str = padded_left[0:half_dim]
+    right_bin_str = padded_right[0:half_dim]
+    # Right
+    return int(left_bin_str + right_bin_str, 2)
+
+
+def field_exp(x, exp, F):
+    product = x
+    for i in range(exp - 1):
+        # print(x, exp, product)
+        product = F.Multiply(x, product)
+    return product
+
+
+def print_matrix(M):
+    for i in M:
+        for j in i:
+            print(j, end="\t")
+        print()
+
+
+def pow_funcs_sum_to_zero():
+    """
+    Print what power functions sum to zero.
+    """
+    to_return = []
+    for dim in range(6, 27, 2):
+        print('Dim', dim)
+        F = ffield.FField(int(dim / 2))
+
+        exp_arr = []
+        for exp in range(20):
+            sum = 0
+            for p in range(int(2 ** int(dim / 2))):
+                sum ^= field_exp(p, exp, F)
+            exp_arr.append(sum == 0)
+        to_return.append(exp_arr)
+    print_matrix(to_return)
+
+
+def inverse(p):
+    if p != 0:
+        return F.Inverse(p)
+    return 0
+
+
+def gold(p, F, k=1, dim=-1, find_nontrivial_k=False):
+    assert math.gcd(dim, k) == 1
+    if find_nontrivial_k:
+        for l in range(2, dim // 2 + 1):
+            if math.gcd(dim, l) == 1:
+                k = l
+                break
+    print(k)
+    return field_exp(p, int(2 ** k) + 1, F)
+
+
+def kasami(p, F, k=1, dim=-1, find_nontrivial_k=False):
+    assert math.gcd(dim, k) == 1
+    if find_nontrivial_k:
+        for l in range(2, dim + 1):
+            if math.gcd(dim, l) == 1:
+                k = l
+    pow = 2 ** (2 * k) + (-2) ** k + 1
+    return field_exp(p, pow, F)
+
+
+def dobbertin(p, dim, F):
+    t = dim / 5
+    pow = int(2 ** (4 * t) + 2 ** (3 * t) + 2 ** (2 * t) + 2 ** t - 1)
+    return field_exp(p, pow, F)
+
+
+if __name__ == '__main__':
+    # pow = 3
+    dim = 10
     F = ffield.FField(int(dim / 2))
-    for x in range(0, 16):
-        xcubed = F.Multiply(F.Multiply(x, x), x)
-        print(xcubed)
+    f = lambda p: kasami(p, F, dim=dim, find_nontrivial_k=True)
+    # f = lambda p: kasami(p, F, dim=int(dim / 2), findNonTrivialk=True)
+    # f = lambda p: dobbertin(p, int(dim / 2), F)
+    # for dim in range(6, 25, 2):
+    #     F = ffield.FField(int(dim / 2))
+    #     f = lambda p: gold(p, F, dim=int(dim / 2), find_nontrivial_k=True)
+    #     pts = build_points(dim, f)
+    pts = build_points(dim, f)
+    if is_cap(pts):
+        print('dim', dim, 'pow', 'nontrivial', 'cap:', pts)
+        print(cap.exclude_dist(pts))
+        # if is_k_cover(pts):
+        #     print('Is a k-cover')
+        # else:
+        #     print('Not k-cover')
+    else:
+        print(pts)
 
-    if dim == 8:
-        for p in cap:
-            left = p & 0b11110000
-            binLeft = "{0:b}".format(left)
-            paddedBin = binLeft.rjust(dim, '0')
-            newNum = paddedBin[0:int(dim / 2)]
-
-            left = int(newNum, 2)
-            right = p & 0b00001111
-            print(left, right)
+# func_matrix = []
+# for pow in range(1, 33):
+#     print('Doing powers of', pow)
+#     dims = []
+#     for dim in range(4, 27, 2):
+#         F = ffield.FField(int(dim / 2))
+#         f = lambda p: field_exp(p, pow, F)
+#         pts = build_points(dim, f)
+#         # the is_cap method is what takes the longest since it's of order n choose 2
+#         if is_cap(pts):
+#             dims.append(dim)
+#             # print('dim', dim, 'pow', pow, 'cap:', pts)
+#     func_matrix.append(dims)
+# print_matrix(func_matrix)
