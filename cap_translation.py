@@ -2,15 +2,19 @@ from decompose_cap_pts import *
 import numpy as np
 
 
-def translate_cap(cap, p, dim):
-    '''
+def translate_cap(cap, p1, p2, dim):
+    translation = stitch_pts(p1, p2, dim)
+    return [translation ^ x for x in cap]
+
+
+def special_translate_cap(cap, p, dim):
+    """
     Translates the whole cap by (p,f(p)).
     :param cap: The cap to translate
     :param p: The representative
     :return:
-    '''
-    translation = stitch_pts(p, p, dim)
-    return [translation ^ x for x in cap]
+    """
+    return translate_cap(cap, p, p, dim)
 
 
 def scale_cap(cap, p, dim):
@@ -21,7 +25,7 @@ def scale_cap(cap, p, dim):
 
 if __name__ == '__main__':
     # Do not use AB function
-    STRICTLY_APN = True
+    STRICTLY_APN = False
     for n in range(5, 11):
         print('n\t', n)
         dim = n * 2
@@ -38,17 +42,15 @@ if __name__ == '__main__':
         assert is_cap(cap)
         total_points = []
         for t in range(0, 2 ** n):
-            translation = translate_cap(cap, t, dim)
+            translation = translate_cap(cap, t, t, dim)
+            # before = len(set(total_points))
             total_points.extend(translation)
+            # after = len(set(total_points))
+            # print('unique points added\t', after - before)
             if not is_cap(translation):
                 # Should be impossible. Always a cap by translation
                 print('Not cap\t', translation)
                 exit()
-        count = 0
-        not_count = 0
-        for p in range(2 ** dim):
-            if p not in total_points:
-                not_count += 1
-            else:
-                count += 1
+        count = len(set(total_points))
+        not_count = 2 ** dim - count
         print(count, not_count)
