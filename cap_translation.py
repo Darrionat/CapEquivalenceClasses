@@ -1,5 +1,8 @@
+import sys
+
 from decompose_cap_pts import *
 import numpy as np
+import pickle
 
 
 def translate_cap(cap, p1, p2, dim):
@@ -23,34 +26,47 @@ def scale_cap(cap, p, dim):
     return [F.Multiply(translation, x) for x in cap]
 
 
-if __name__ == '__main__':
-    # Do not use AB function
-    STRICTLY_APN = False
-    for n in range(5, 11):
-        print('n\t', n)
-        dim = n * 2
-        field = ffield.FField(n)
-        if STRICTLY_APN:
-            if n % 5 != 0:
-                print('n not divisible by 5')
-                continue
-            f = lambda x: dobbertin(x, dim, field)
+def special_translators_sim(n, apn_not_ab):
+    # print('n\t', n)
+    dim = n * 2
+    field = ffield.FField(n)
+    if apn_not_ab:
+        if n % 2 == 1:
+            f = lambda x: inverse(x, n, field)
+        elif n % 5 == 0:
+            f = lambda x: dobbertin(x, n, field)
         else:
-            f = lambda x: gold(x, field, dim=dim, find_nontrivial_k=True)
+            exit(1)
+    else:
+        f = lambda x: gold(x, field, dim=n, find_nontrivial_k=True)
 
-        cap = build_points(dim, f)
-        assert is_cap(cap)
-        total_points = []
-        for t in range(0, 2 ** n):
-            translation = translate_cap(cap, t, t, dim)
-            # before = len(set(total_points))
-            total_points.extend(translation)
-            # after = len(set(total_points))
-            # print('unique points added\t', after - before)
-            if not is_cap(translation):
-                # Should be impossible. Always a cap by translation
-                print('Not cap\t', translation)
-                exit()
-        count = len(set(total_points))
-        not_count = 2 ** dim - count
-        print(count, not_count)
+    cap = build_points(dim, f)
+    # total_points = set()
+    # two_fixed = 0
+    # with open('total_points', 'w') as f:
+    for t in range(0, 2 ** n):
+        # x in cap
+        # (t,t) + x for all x
+        translation = special_translate_cap(cap, t, dim)
+        for p in translation:
+            print(p)
+            # f.write(f'{p}\n')
+        # total_points.update(translation)
+        # fixed_points = len(set(translation) & set(cap))
+        # if fixed_points == 2:
+        #     two_fixed += 1
+
+
+# count = len(total_points)
+# not_count = 2 ** dim - count
+# print('Translation Cover #\t', count, 'Translation Not-Cover #\t', not_count)
+# print('2-Fix\t', two_fixed)
+
+
+if __name__ == '__main__':
+    '''
+    USAGE: python3 cap_translation.py [0 or 1 for strict_apn] [n] | sort -nu > total_points_sorted && wc -l total_points_sorted
+    '''
+    n = int(sys.argv[-1])
+    strict_apn = int(sys.argv[-2])
+    special_translators_sim(n, strict_apn)

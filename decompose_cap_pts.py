@@ -61,11 +61,28 @@ def stitch_pts(left, right, dim):
 
 
 def field_exp(x, exp, F):
-    product = x
-    for i in range(exp - 1):
-        # print(x, exp, product)
-        product = F.Multiply(x, product)
-    return product
+    # 'Fast' exponentiation (Wikipedia)
+    # https://en.wikipedia.org/wiki/Exponentiation_by_squaring
+    n = exp
+    if n == 0:
+        return 1
+    a = x
+    y = 1
+    while n > 1:
+        if n % 2 == 0:
+            a = F.Multiply(a, a)
+            n = n / 2
+        else:
+            y = F.Multiply(a, y)
+            a = F.Multiply(a, a)
+            n = (n - 1) / 2
+    return F.Multiply(a, y)
+    # Old, slow and naive algorithm
+    # product = x
+    # for i in range(exp - 1):
+    #     # print(x, exp, product)
+    #     product = F.Multiply(x, product)
+    # return product
 
 
 def print_matrix(M):
@@ -122,8 +139,16 @@ def kasami(p, F, k=1, dim=-1, find_nontrivial_k=False):
 
 
 def dobbertin(p, dim, F):
+    assert dim % 5 == 0
     t = dim / 5
     pow = int(2 ** (4 * t) + 2 ** (3 * t) + 2 ** (2 * t) + 2 ** t - 1)
+    return field_exp(p, pow, F)
+
+
+def inverse(p, dim, F):
+    assert dim % 2 == 1
+    t = (dim - 1) / 2
+    pow = int(2 ** (2 * t) - 1)
     return field_exp(p, pow, F)
 
 
