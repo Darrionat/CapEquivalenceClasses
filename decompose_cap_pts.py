@@ -152,6 +152,14 @@ def inverse(p, dim, F):
     return field_exp(p, pow, F)
 
 
+def surjective_function(f, field_dim, field):
+    all_points = list(range(2 ** field_dim))
+    for p in range(2 ** field_dim):
+        if f(p) in all_points:
+            all_points.remove(f(p))
+    return len(all_points) == 0
+
+
 if __name__ == '__main__':
     # pow = 3
     dim = 10
