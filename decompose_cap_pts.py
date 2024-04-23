@@ -3,93 +3,37 @@ from cap import *
 from pyfinite import ffield
 
 
-def build_points(dim, f):
-    """
-    Builds a set of points in F_{2^n} with the structure (x, f(x)) with respect to the additive isomorphism between
-    F_{2^n} and F_{2^{n/2}} * F_{2^{n/2}}.
-    :param dim: The dimension.
-    :param fx: A function to apply to each point in F_{2^{n/2}}.
-    :return:
-    """
-    assert dim % 2 == 0
-    to_return = []
-    for p in range(int(2 ** (dim / 2))):
-        to_return.append(stitch_pts(p, f(p), dim))
-    return to_return
+#
+# def build_pts_4(dim, f, point_structure):
+#     """
+#         Builds a set of points in F_{2^n} with the structure (x,y,z,w) with respect to the additive isomorphism between
+#         F_{2^n} and F_{2^{n/4}} *  ... * F_{2^{n/4}}.
+#         :param dim: The dimension.
+#         :param fx: A function to apply to each point in F_{2^{n/4}}.
+#         :param point_structure: The way to make the points. Defines the form of (x,y,z,w).
+#         :return:
+#         """
+#     assert dim % 4 == 0
+#     half_dim = int(dim / 2)
+#     to_return = []
+#     for p in range(int(2 ** (dim / 4))):
+#         point_tuple = point_structure(p, f)
+#         stitch1 = concatenate_binary_strings(point_tuple[0], point_tuple[1], dim)
+#         stitch2 = concatenate_binary_strings(point_tuple[2], point_tuple[3], dim)
+#         to_return.append(concatenate_binary_strings(stitch1, stitch2, dim))
+#     return to_return
 
 
-def build_pts_4(dim, f, point_structure):
+def concatenate_binary_strings(left, right, n):
     """
-        Builds a set of points in F_{2^n} with the structure (x,y,z,w) with respect to the additive isomorphism between
-        F_{2^n} and F_{2^{n/4}} *  ... * F_{2^{n/4}}.
-        :param dim: The dimension.
-        :param fx: A function to apply to each point in F_{2^{n/4}}.
-        :param point_structure: The way to make the points. Defines the form of (x,y,z,w).
-        :return:
-        """
-    assert dim % 4 == 0
-    half_dim = int(dim / 2)
-    to_return = []
-    for p in range(int(2 ** (dim / 4))):
-        point_tuple = point_structure(p, f)
-        stitch1 = stitch_pts(point_tuple[0], point_tuple[1], half_dim)
-        stitch2 = stitch_pts(point_tuple[2], point_tuple[3], half_dim)
-        to_return.append(stitch_pts(stitch1, stitch2, dim))
-    return to_return
-
-
-def stitch_pts(left, right, dim):
-    """
-    Stitches the two binary strings of the given points together.
-    Given two point p1 and p2, we return the point (p1, p2).
+    Stitches the two binary strings of the given integers together to create a new integer.
+    Given two integers p1 and p2, we return the point (p1, p2).
     :param left: p1
     :param right: p2
-    :param dim: The dimension of the point to return.
-    :return:
+    :param n: The dimension of the field which both p1 and p2 lie in.
+    :return: The newly constructed point which lies in dimension 2n.
     """
-    assert dim % 2 == 0
-    half_dim = int(dim / 2)
-    # Left
-    bin_left = "{0:b}".format(left)
-    bin_right = "{0:b}".format(right)
-    padded_left = bin_left.rjust(half_dim, '0')
-    padded_right = bin_right.rjust(half_dim, '0')
-    left_bin_str = padded_left[0:half_dim]
-    right_bin_str = padded_right[0:half_dim]
-    # Right
-    return int(left_bin_str + right_bin_str, 2)
-
-
-def field_exp(x, exp, F):
-    # 'Fast' exponentiation (Wikipedia)
-    # https://en.wikipedia.org/wiki/Exponentiation_by_squaring
-    n = exp
-    if n == 0:
-        return 1
-    a = x
-    y = 1
-    while n > 1:
-        if n % 2 == 0:
-            a = F.Multiply(a, a)
-            n = n / 2
-        else:
-            y = F.Multiply(a, y)
-            a = F.Multiply(a, a)
-            n = (n - 1) / 2
-    return F.Multiply(a, y)
-    # Old, slow and naive algorithm
-    # product = x
-    # for i in range(exp - 1):
-    #     # print(x, exp, product)
-    #     product = F.Multiply(x, product)
-    # return product
-
-
-def print_matrix(M):
-    for i in M:
-        for j in i:
-            print(j, end="\t")
-        print()
+    return int(f"{left:0{n}b}{right:0{n}b}", 2)
 
 
 def pow_funcs_sum_to_zero():
@@ -109,55 +53,6 @@ def pow_funcs_sum_to_zero():
             exp_arr.append(sum == 0)
         to_return.append(exp_arr)
     print_matrix(to_return)
-
-
-def inverse(p):
-    if p != 0:
-        return F.Inverse(p)
-    return 0
-
-
-def gold(p, F, k=1, dim=-1, find_nontrivial_k=False):
-    assert math.gcd(dim, k) == 1
-    if find_nontrivial_k:
-        for l in range(2, dim // 2 + 1):
-            if math.gcd(dim, l) == 1:
-                k = l
-                break
-    # print(k)
-    return field_exp(p, int(2 ** k) + 1, F)
-
-
-def kasami(p, F, k=1, dim=-1, find_nontrivial_k=False):
-    assert math.gcd(dim, k) == 1
-    if find_nontrivial_k:
-        for l in range(2, dim + 1):
-            if math.gcd(dim, l) == 1:
-                k = l
-    pow = 2 ** (2 * k) + (-2) ** k + 1
-    return field_exp(p, pow, F)
-
-
-def dobbertin(p, dim, F):
-    assert dim % 5 == 0
-    t = dim / 5
-    pow = int(2 ** (4 * t) + 2 ** (3 * t) + 2 ** (2 * t) + 2 ** t - 1)
-    return field_exp(p, pow, F)
-
-
-def inverse(p, dim, F):
-    assert dim % 2 == 1
-    t = (dim - 1) / 2
-    pow = int(2 ** (2 * t) - 1)
-    return field_exp(p, pow, F)
-
-
-def surjective_function(f, field_dim, field):
-    all_points = list(range(2 ** field_dim))
-    for p in range(2 ** field_dim):
-        if f(p) in all_points:
-            all_points.remove(f(p))
-    return len(all_points) == 0
 
 
 if __name__ == '__main__':

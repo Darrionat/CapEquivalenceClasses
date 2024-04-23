@@ -7,7 +7,7 @@ def direct_sum(cap1, cap2):
     to_return = set()
     for p1 in cap1:
         for p2 in cap2:
-            to_return.add(stitch_pts(p1, p2, 2 * d))
+            to_return.add(concatenate_binary_strings(p1, p2, 2 * d))
     return list(to_return)
 
 

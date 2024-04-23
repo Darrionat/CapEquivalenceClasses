@@ -2,7 +2,7 @@ from decompose_cap_pts import *
 
 
 def translate_cap(cap, p1, p2, dim):
-    translation = stitch_pts(p1, p2, dim)
+    translation = concatenate_binary_strings(p1, p2, dim)
     return [translation ^ x for x in cap]
 
 
@@ -17,7 +17,7 @@ def special_translate_cap(cap, p, dim):
 
 
 def scale_cap(cap, p, dim):
-    translation = stitch_pts(p, p, dim)
+    translation = concatenate_binary_strings(p, p, dim)
     F = ffield.FField(dim)
     return [F.Multiply(translation, x) for x in cap]
 

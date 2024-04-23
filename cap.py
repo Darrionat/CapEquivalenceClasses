@@ -1,7 +1,12 @@
+from functools import reduce
 from itertools import combinations
+
+import cap_matrix
 import cap_matrix as cmat
 import numpy as np
 import math
+
+import decompose_cap_pts
 import linalg
 import random
 from tait_won_sidon import build_tait_won_sidon
@@ -29,17 +34,15 @@ def is_cap(points):
     """
     pairs = set()
     for comb in combinations(points, 2):
-        pair_sum = 0
-        for x in comb:
-            pair_sum ^= x
-        if pair_sum in pairs:
+        sum_xor = comb[0] ^ comb[1]
+        if sum_xor in pairs:
             return False
-        pairs.add(pair_sum)
+        pairs.add(sum_xor)
     return True
 
 
 def is_k_cover(cap):
-    assert is_cap(cap)
+    # assert is_cap(cap)
     return len(exclude_dist(cap)) == 1
 
 
@@ -50,6 +53,7 @@ binStringCache = {}
 
 
 def calc_arank(points):
+    binStringCache = {}
     """
     Computes the affine rank of the given points.
     :param cap:  Some points.
@@ -201,29 +205,44 @@ def normalize_cap(cap):
     return cmat.build_cap(M)
 
 
-def excludes_count(cap):
+def exclude_points_multiplicities(cap):
+    """
+    Returns a dictionary where keys are the exclude points and the value is their exclude multiplicity.
+    If a point has an exclude multiplicity of k, then we call it a k-point.
+    Throws an exception if the given array of points is not a cap.
+    :param cap: The cap
+    :return: The exclude points and their multiplicities
+    """
     excludes = {}
     for comb in combinations(cap, 3):
-        sum = 0
-        for p in comb:
-            sum ^= p
-        if sum not in excludes:
-            excludes[sum] = 1
-        else:
-            excludes[sum] += 1
+        sum_xor = reduce(lambda x, y: x ^ y, comb)
+        excludes[sum_xor] = excludes.get(sum_xor, 0) + 1
+    if set(cap) & set(excludes.keys()):
+        raise Exception("Points given are not a cap")
     return excludes
 
 
 def exclude_dist(cap):
-    counts = excludes_count(cap)
+    """
+    Returns a dictionary where keys are the k-points that appear in a cap, and the values being their frequency.
+    If there are no k-points of a cap, then the value k will not be a key of the returned dictionary.
+    :param cap: The cap
+    :return: The exclude distribution of the cap
+    """
+    counts = exclude_points_multiplicities(cap)
     dist = {}
-    for key in counts:
-        v = counts[key]
-        if v not in dist:
-            dist[v] = 1
-        else:
-            dist[v] += 1
+    for v in counts.values():
+        dist[v] = dist.get(v, 0) + 1
+    n = dimension(cap)
+    dist[0] = 2 ** n - (sum(dist.values())) - len(cap)
     return dist
+
+
+def maximal(cap):
+    """
+    Here maximal is defined as having no zero-points.
+    """
+    return exclude_dist(cap)[0] == 0
 
 
 def tait_won_case():
@@ -240,12 +259,103 @@ def tait_won_change_basis(dim):
     print(change_basis(cap))
 
 
-if __name__ == '__main__':
-    for d in range(4, 64, 2):
-        print('Dimension:', d)
-        cap = build_tait_won_sidon(d)
-        print('Cap:', cap)
-        print('Size:', len(cap))
-        dist = exclude_dist(cap)
-        for k in dist:
-            print('\t' + str(k) + '\t' + str(dist[k]))
+def print_exclude_dist(cap):
+    print('Affine Rank:', calc_arank(cap))
+    print('Cap:', cap)
+    print('Size:', len(cap))
+    dist = exclude_dist(cap)
+    for k in dist:
+        print('\t' + str(k) + '\t' + str(dist[k]))
+
+
+def print_matrix(M):
+    for i in M:
+        for j in i:
+            print(j, end="\t")
+        print()
+
+
+# Sorts the columns and rows into descending order w.r.t. row/column sums
+def sort_matrix_rows_cols(M):
+    row_sums, col_sums = cap_matrix.get_row_col_sums(M)
+    # Sort the columns based on the non-zero counts in descending order
+    # Create a list of column indices sorted by non-zero counts in descending order
+    sorted_column_indices = sorted(range(len(col_sums)), key=lambda x: col_sums[x],
+                                   reverse=True)
+
+    # Create a sorted matrix based on the sorted column indices
+    col_sorted_matrix = [[M[row][col] for col in sorted_column_indices] for row in range(len(M))]
+
+    # do the same for rows
+    sorted_row_indices = sorted(range(len(row_sums)), key=lambda x: row_sums[x], reverse=True)
+
+    # Create a sorted matrix based on the sorted row indices
+    return [col_sorted_matrix[row_idx] for row_idx in sorted_row_indices]
+
+
+def complete_caps_primeKpoint_matrices():
+    # dim2_1point = [0, 1, 2] too small for matrix
+    # dim3_1point = [0, 1, 4, 2] too small for matrix
+    dim4_2point = [0, 1, 4, 2, 8, 15]
+    dim5_2point = [0, 1, 4, 2, 8, 15, 16]
+    dim6_3point = [0, 1, 4, 2, 8, 15, 16, 32, 54]
+    dim7_3point = [0, 1, 4, 2, 8, 15, 16, 64, 32, 85, 54, 109]
+    dim8_5point = [0, 1, 4, 2, 8, 15, 16, 64, 32, 128, 165, 85, 54, 201, 250]
+    dim9_7point = [0, 1, 2, 4, 8, 16, 32, 63, 64, 89, 94, 128, 173, 207, 256, 269, 316, 327, 423, 442, 457]
+    dim10_11point = [0, 1, 2, 4, 8, 16, 32, 64, 128, 166, 248, 256, 308, 367, 369, 482, 507, 512, 540, 619, 630, 707,
+                     753, 823, 841, 846, 868, 923, 933, 938, 982, 984, 1021]
+
+    complete_caps_primeKpoint = [dim4_2point, dim5_2point, dim6_3point, dim7_3point, dim8_5point, dim9_7point,
+                                 dim10_11point]
+    for cap in complete_caps_primeKpoint:
+        normal_cap = normalize_cap(cap)
+        print(f'dim={dimension(cap)}\ncap={cap}')
+        matrix = find_cap_matrix(cap)
+        sorted_matrix = sort_matrix_rows_cols(matrix)
+        print_matrix(sorted_matrix)
+        print(f'newcap={cmat.build_cap(sorted_matrix)}')
+        print()
+
+
+def binary_split(n, k):
+    # Convert n to a binary string of length k
+    binary_str = format(n, f'0{k}b')
+
+    # Calculate the midpoint index for splitting
+    midpoint = k // 2
+
+    # Split the binary string into two parts
+    first_half = binary_str[:midpoint]
+    second_half = binary_str[midpoint:]
+
+    return first_half, second_half
+
+#
+# if __name__ == '__main__':
+#     dim4_2point = [0, 1, 4, 2, 8, 15]
+#     dim5_2point = [0, 1, 4, 2, 8, 15, 16]
+#     dim6_3point = [0, 1, 4, 2, 8, 15, 16, 32, 54]
+#     dim7_3point = [0, 1, 4, 2, 8, 15, 16, 64, 32, 85, 54, 109]
+#     dim8_5point = [0, 1, 4, 2, 8, 15, 16, 64, 32, 128, 165, 85, 54, 201, 250]
+#     dim9_7point = [0, 1, 2, 4, 8, 16, 32, 63, 64, 89, 94, 128, 173, 207, 256, 269, 316, 327, 423, 442, 457]
+#     dim10_11point = [0, 1, 2, 4, 8, 16, 32, 64, 128, 166, 248, 256, 308, 367, 369, 482, 507, 512, 540, 619, 630, 707,
+#                      753, 823, 841, 846, 868, 923, 933, 938, 982, 984, 1021]
+#
+#     # complete_caps_primeKpoint = [dim4_2point, dim5_2point, dim6_3point, dim7_3point, dim8_5point, dim9_7point,
+#     #                              dim10_11point]
+#
+#     normal_cap = normalize_cap(dim8_5point)
+#     dim = dimension(normal_cap)
+#     print(normal_cap)
+#     for point in normal_cap:
+#         bin_split = binary_split(point, dim)
+#         print(f'{bin_split[0]}')
+#
+#     # for d in range(4, 64, 2):
+#     #     print('Dimension:', d)
+#     #     cap = build_tait_won_sidon(d)
+#     #     print('Cap:', cap)
+#     #     print('Size:', len(cap))
+#     #     dist = exclude_dist(cap)
+#     #     for k in dist:
+#     #         print('\t' + str(k) + '\t' + str(dist[k]))

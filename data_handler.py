@@ -4,7 +4,7 @@ import equivalence_classes
 
 
 def get_folder_path(cap_size):
-    return str(cap_size) + '_caps'
+    return 'caps' + os.sep + str(cap_size) + '_caps'
 
 
 def path(cap_size, arank):
